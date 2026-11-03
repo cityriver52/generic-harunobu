@@ -70,6 +70,7 @@ function checkSpreadsheetByUrl(url) {
     totalSheets: candidates.length,
     scannedSheets: audit.scanned,
     skipped: audit.skipped,
+    coverageNotes: audit.coverageNotes,
     truncated: audit.truncated,
     count: audit.findings.length,
     counts: {
@@ -97,6 +98,7 @@ function spreadsheetCellUrl_(id, gid, a1) {
 function collectChecks_(sheets) {
   const findings = [];
   const skipped = [];
+  const coverageNotes = [];
   let truncated = false;
   let scanned = 0;
   for (const sheet of sheets) {
@@ -108,6 +110,10 @@ function collectChecks_(sheets) {
       continue;
     }
     scanned++;
+    const metadata = sheetInspectionMetadata_(sheet, rowCount, colCount);
+    if (metadata.limitations.length) {
+      coverageNotes.push(sheet.getName() + '：' + metadata.limitations.join('、'));
+    }
     const result = inspectGrid_({
       sheetName: sheet.getName(),
       values: range.getValues(),
@@ -116,12 +122,12 @@ function collectChecks_(sheets) {
         return merged.getA1Notation();
       }),
       gid: sheet.getSheetId(),
-      ...sheetInspectionMetadata_(sheet, rowCount, colCount)
+      ...metadata
     }, GH_CONFIG.MAX_FINDINGS - findings.length);
     Array.prototype.push.apply(findings, result.findings);
     truncated = truncated || result.truncated;
   }
-  return { findings: findings, skipped: skipped, truncated: truncated, scanned: scanned };
+  return { findings: findings, skipped: skipped, truncated: truncated, scanned: scanned, coverageNotes: coverageNotes };
 }
 
 /** Adds a menu when the spreadsheet opens. */

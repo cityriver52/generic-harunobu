@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <base target="_top">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>generic-harunobu | 機械可読性チェッカー</title>
+  <style>
+    :root { color-scheme: light; --ink:#15283d; --muted:#65778b; --border:#dce5ed; --bg:#f4f7fa; --surface:#fff; --blue:#1b658e; --teal:#0a786f; --red:#ac3e46; --orange:#946211; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: -apple-system,BlinkMacSystemFont,"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; color:var(--ink); background:var(--bg); font-size:14px; line-height:1.65; }
+    .top { background:linear-gradient(110deg,#18344b 0%,#205476 100%); color:white; padding:31px 20px 54px; }
+    .wrap { width:min(1120px,100% - 36px); margin:0 auto; }
+    .identity { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.02em; }
+    .identity .mark { width:32px; height:32px; border-radius:10px; background:#c1efe7; color:#143e4f; display:grid; place-items:center; font-weight:800; }
+    h1 { font-size:clamp(25px,4vw,34px); margin:30px 0 8px; font-weight:750; letter-spacing:-.03em; }
+    .top p { margin:0; color:#e1ebf2; max-width:710px; }
+    main { margin-top:-31px; padding-bottom:48px; }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px; box-shadow:0 8px 28px rgba(24,48,70,.05); margin-bottom:20px; }
+    .eyebrow { color:var(--teal); font-size:12px; font-weight:750; letter-spacing:.07em; text-transform:uppercase; }
+    h2 { margin:4px 0 14px; font-size:19px; }
+    .url-row { display:flex; gap:10px; }
+    input[type=url] { flex:1; min-width:0; border:1px solid #bfccd8; border-radius:9px; padding:13px 14px; font:inherit; background:white; color:var(--ink); }
+    input[type=url]:focus,select:focus,input[type=search]:focus { outline:3px solid rgba(34,121,153,.18); border-color:#3c89a6; }
+    button { font:inherit; cursor:pointer; border:0; border-radius:9px; padding:12px 22px; font-weight:700; background:#126c71; color:white; white-space:nowrap; }
+    button:hover:not(:disabled) { background:#0d565c; }
+    button:disabled { opacity:.58; cursor:wait; }
+    .hint { font-size:12px; color:var(--muted); margin:10px 0 0; }
+    .alert { padding:12px 15px; border-radius:9px; border:1px solid #f1c4be; background:#fff5f3; color:#8e3432; margin-top:14px; }
+    .note { color:#865c1d; background:#fff9e9; border:1px solid #f0d69c; padding:12px 15px; border-radius:9px; margin:14px 0; }
+    .success { color:#086c54; background:#eefaf4; border:1px solid #b9e5d0; padding:12px 15px; border-radius:9px; margin:14px 0; }
+    [hidden] { display:none !important; }
+    .meta { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .meta small { display:block; color:var(--muted); }
+    a { color:var(--blue); overflow-wrap:anywhere; }
+    .summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    .stat { background:#f7fafb; border:1px solid var(--border); border-radius:11px; padding:12px 16px; }
+    .stat strong { display:block; font-size:27px; font-variant-numeric:tabular-nums; line-height:1.2; }
+    .stat span { color:var(--muted); font-size:12px; }
+    .stat.bad strong { color:var(--red); }
+    .stat.warn strong { color:var(--orange); }
+    .toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:20px 0 12px; }
+    .toolbar label { color:var(--muted); font-size:12px; }
+    select,input[type=search] { padding:9px 11px; border:1px solid #ccd7e0; border-radius:9px; background:#fff; font:inherit; }
+    input[type=search] { width:min(270px,100%); }
+    .table-scroll { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
+    table { width:100%; border-collapse:collapse; min-width:900px; table-layout:fixed; }
+    th,td { padding:11px 12px; text-align:left; border-bottom:1px solid var(--border); vertical-align:top; overflow-wrap:anywhere; }
+    th { font-size:12px; background:#f0f5f8; color:#40566c; position:sticky; top:0; }
+    tr:last-child td { border-bottom:0; }
+    tr:hover td { background:#f9fbfc; }
+    th:nth-child(1) { width:87px; } th:nth-child(2) { width:94px; } th:nth-child(3) { width:142px; } th:nth-child(4) { width:105px; } th:nth-child(5) { width:215px; } th:nth-child(6) { width:240px; }
+    .severity { display:inline-block; font-weight:700; border-radius:7px; padding:3px 8px; font-size:12px; }
+    .severity.fix { color:#9b343d; background:#ffedf0; }
+    .severity.review { color:#91611a; background:#fff4dc; }
+    .table-foot { color:var(--muted); font-size:12px; margin-top:10px; }
+    footer { margin-top:30px; color:var(--muted); font-size:12px; text-align:center; }
+    @media(max-width:640px) { .top { padding-top:22px; } .card { padding:18px 16px; } .url-row { flex-direction:column; } .summary { grid-template-columns:repeat(2,minmax(0,1fr)); } button { width:100%; } .toolbar input[type=search] { width:100%; } }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="identity"><span class="mark" aria-hidden="true">H</span><span>generic-harunobu <small style="opacity:.72;font-weight:400">/ GAS版</small></span></div>
+      <h1>スプレッドシートの機械可読性をチェック</h1>
+      <p>URLを貼り付けるだけ。問題のあるセルと、具体的な修正案をまとめて確認できます。</p>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="card" aria-labelledby="input-heading">
+      <div class="eyebrow">STEP 01 / URL入力</div>
+      <h2 id="input-heading">診断するスプレッドシート</h2>
+      <form id="check-form">
+        <div class="url-row">
+          <input id="sheet-url" name="sheet-url" type="url" required autocomplete="url" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…" aria-label="GoogleスプレッドシートのURL">
+          <button id="check-button" type="submit">診断を実行</button>
+        </div>
+      </form>
+      <p class="hint">対象の全シートを診断します（生成した「機械可読性_検査結果」は除外）。元のデータは変更しません。</p>
+      <div id="status" role="status" aria-live="polite" class="hint" hidden></div>
+      <div id="error" role="alert" class="alert" hidden></div>
+    </section>
+    <section id="result" class="card" aria-labelledby="result-heading" hidden>
+      <div class="eyebrow">STEP 02 / 診断結果</div>
+      <div class="meta">
+        <div>
+          <h2 id="result-heading" style="margin-bottom:1px"></h2>
+          <small id="scanned"></small>
+        </div>
+        <a id="source-link" href="#" target="_blank" rel="noopener noreferrer">元のスプレッドシートを開く</a>
+      </div>
+      <div id="summary" class="summary" aria-label="診断サマリー"></div>
+      <div id="report-message" hidden></div>
+      <div class="toolbar">
+        <label for="severity-filter">重要度</label>
+        <select id="severity-filter">
+          <option value="">すべて</option>
+          <option value="要修正">要修正</option>
+          <option value="要確認">要確認</option>
+        </select>
+        <input id="keyword" type="search" placeholder="ルール・シート名・理由で絞り込み" aria-label="結果の検索">
+      </div>
+      <div class="table-scroll"><table><thead><tr><th>重要度</th><th>ルールID</th><th>シート</th><th>問題セル</th><th>理由</th><th>修正案</th></tr></thead><tbody id="findings"></tbody></table></div>
+      <p id="table-foot" class="table-foot"></p>
+    </section>
+    <footer>デジタル庁の公開ルールを参考にした独自MVPです。公式Harunobuの判定・100点採点とは一致しません。</footer>
+  </main>
+  <script>
+  'use strict';
+  const form = document.getElementById('check-form');
+  const submit = document.getElementById('check-button');
+  const input = document.getElementById('sheet-url');
+  const error = document.getElementById('error');
+  const status = document.getElementById('status');
+  const resultPanel = document.getElementById('result');
+  const findingsBody = document.getElementById('findings');
+  let current = null;
+
+  function el(tag, text, className) {
+    const node = document.createElement(tag);
+    if (text != null) node.textContent = String(text);
+    if (className) node.className = className;
+    return node;
+  }
+  function setBusy(working) {
+    submit.disabled = working;
+    input.disabled = working;
+    submit.textContent = working ? '診断中…' : '診断を実行';
+    status.hidden = !working;
+    status.textContent = working ? 'ファイルを読み取り、ルールに照らして検査しています。' : '';
+  }
+  function addStat(container, label, count, className) {
+    const stat = el('div', null, 'stat' + (className ? ' ' + className : ''));
+    stat.append(el('strong', count), el('span', label));
+    container.append(stat);
+  }
+  function renderTable() {
+    if (!current) return;
+    const severity = document.getElementById('severity-filter').value;
+    const keyword = document.getElementById('keyword').value.trim().toLowerCase();
+    const matching = current.findings.filter(item => {
+      if (severity && item.severity !== severity) return false;
+      return !keyword || [item.ruleId, item.sheetName, item.cell, item.reason, item.suggestion]
+        .some(v => String(v).toLowerCase().includes(keyword));
+    });
+    findingsBody.replaceChildren();
+    for (const item of matching) {
+      const tr = document.createElement('tr');
+      tr.append(el('td'));
+      tr.firstChild.append(el('span', item.severity, 'severity ' + (item.severity === '要修正' ? 'fix' : 'review')));
+      tr.append(el('td', item.ruleId));
+      tr.append(el('td', item.sheetName));
+      const cell = el('td');
+      const link = el('a', item.cell);
+      link.href = item.url;
+      link.target = '_blank'; link.rel = 'noopener noreferrer';
+      cell.append(link);
+      tr.append(cell, el('td', item.reason), el('td', item.suggestion));
+      findingsBody.append(tr);
+    }
+    if (!matching.length) {
+      const empty = el('tr'); const td = el('td', '表示する指摘はありません。');
+      td.colSpan = 6; empty.append(td); findingsBody.append(empty);
+    }
+    const previewed = current.findings.length;
+    document.getElementById('table-foot').textContent =
+      (current.count > previewed ? '画面では先頭' + previewed + '件を表示しています。全件は結果シートを参照してください。 ' : '') +
+      '現在の絞り込み: ' + matching.length + '件 / 表示対象' + previewed + '件';
+  }
+  function render(data) {
+    current = data;
+    document.getElementById('result-heading').textContent = data.spreadsheetName;
+    document.getElementById('scanned').textContent = data.scannedSheets + ' / ' + data.totalSheets + ' シート検査済み';
+    document.getElementById('source-link').href = data.spreadsheetUrl;
+    const summary = document.getElementById('summary');
+    summary.replaceChildren();
+    addStat(summary, '検出した指摘', data.count);
+    addStat(summary, '要修正', data.counts.fix, 'bad');
+    addStat(summary, '要確認', data.counts.review, 'warn');
+    addStat(summary, '検査したシート', data.scannedSheets);
+    const box = document.getElementById('report-message');
+    box.replaceChildren(); box.hidden = false;
+    if (data.report.saved) {
+      box.className = 'success';
+      box.append(document.createTextNode('診断結果を対象ファイルの「機械可読性_検査結果」に保存しました。 '));
+      const a = el('a', '結果シートを開く');
+      a.href = data.report.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; box.append(a);
+    } else {
+      box.className = 'note';
+      box.textContent = data.report.message || '結果シートには保存されていません。';
+    }
+    if (data.skipped.length || data.truncated) {
+      const warning = el('p',
+        (data.skipped.length ? '未検査（上限超過）: ' + data.skipped.join('、') + '。 ' : '') +
+        (data.truncated ? '検出上限に達したため、診断結果は一部のみです。' : ''), 'note');
+      box.append(warning);
+    }
+    document.getElementById('severity-filter').value = '';
+    document.getElementById('keyword').value = '';
+    renderTable();
+    resultPanel.hidden = false;
+  }
+  document.getElementById('severity-filter').addEventListener('change', renderTable);
+  document.getElementById('keyword').addEventListener('input', renderTable);
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const url = input.value.trim();
+    if (!url) return;
+    error.hidden = true;
+    resultPanel.hidden = true;
+    setBusy(true);
+    google.script.run
+      .withSuccessHandler(data => { setBusy(false); render(data); })
+      .withFailureHandler(err => {
+        setBusy(false);
+        error.textContent = err && err.message ? err.message : '診断に失敗しました。時間をおいて再実行してください。';
+        error.hidden = false;
+      })
+      .checkSpreadsheetByUrl(url);
+  });
+  </script>
+</body>
+</html>

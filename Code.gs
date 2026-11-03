@@ -115,7 +115,8 @@ function collectChecks_(sheets) {
       mergedA1: range.getMergedRanges().map(function(merged) {
         return merged.getA1Notation();
       }),
-      gid: sheet.getSheetId()
+      gid: sheet.getSheetId(),
+      ...sheetInspectionMetadata_(sheet, rowCount, colCount)
     }, GH_CONFIG.MAX_FINDINGS - findings.length);
     Array.prototype.push.apply(findings, result.findings);
     truncated = truncated || result.truncated;
@@ -287,6 +288,7 @@ function inspectGrid_(input, limit) {
       }
     }
   }
+  inspectAdditionalRules_(input, add);
   return { findings: findings, truncated: truncated };
 }
 

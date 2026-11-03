@@ -2,7 +2,9 @@
 
 GoogleスプレッドシートのURLを入力し、**複数のスプレッドシートを1つの画面から診断できるGAS Webアプリ**です。
 
-デジタル庁の[Harunobu](https://www.digital.go.jp/resources/machine-readability-rule/harunobu) と[公開機械可読性ルール](https://github.com/digital-go-jp/machine_readability_rule)を参考にした**独自実装**です。公式Harunobuエンジンの移植版ではなく、公式スコア・判定を再現するものではありません。
+デジタル庁の[公式Harunobu](https://www.digital.go.jp/resources/machine-readability-rule/harunobu)を出発点に、その[公開機械可読性ルール](https://github.com/digital-go-jp/machine_readability_rule)を**Google Workspace内で完結するように再設計・GASで独自実装した非公式の派生ツール**です。公式Pythonコードを直接改変・移植したものではなく、公式スコア・判定を再現するものではありません。
+
+**AI機能なしで公式30項目のうち23項目を直接検出または参考判定します。** ただし網羅的な適合判定ではありません。[30項目の対応表と制限 → RULE_COVERAGE.md](RULE_COVERAGE.md)
 
 ## 機能
 
@@ -45,6 +47,8 @@ Googleの `SpreadsheetApp.openById` により任意のスプレッドシート�
 
 ## 検査ルール（独自実装）
 
+旧MVPの10項目に加えて13項目の判定を追加しました。以下は旧MVPの10項目の概要です。拡張した13項目の内容と、未対応・手動確認の7項目は[全30項目対応表](RULE_COVERAGE.md)に記載しています。
+
 | ルールID | このMVPの検査内容 | 留意点 |
 | --- | --- | --- |
 | L1-03 | 表を分断する完全空白行・列 | 意図的な空行・列も候補になる |
@@ -83,6 +87,8 @@ Node.js組み込みテストで検査ロジック・URL検証・Web経由の読�
 主なファイル:
 
 - `Code.gs` : 診断エンジン + Webアプリのバックエンド
+- `ExtendedChecks.gs` : AIなしで判定する13項目の追加ルール、Sheetsの非表示行・オブジェクト情報収集
+- `RULE_COVERAGE.md` : 公式30項目とGAS判定の対応表、限界
 - `Index.html` : ブラウザUI
 - `appsscript.json` : 全スプレッドシート向けのOAuthスコープ
 - `tests/*.test.cjs` : Node.jsテスト
@@ -92,7 +98,7 @@ Node.js組み込みテストで検査ロジック・URL検証・Web経由の読�
 本ツールのWeb画面のフッターには、次の出典・ライセンス情報を常時表示しています。
 
 > **出典・ライセンス**  
-> 本ツールは、デジタル庁の[機械可読性ルール適合チェックツール「Harunobu」](https://www.digital.go.jp/resources/machine-readability-rule/harunobu)および[「行政データにおける機械可読性に関するルール」](https://github.com/digital-go-jp/machine_readability_rule)を参考に、generic-harunobu開発者が判定ロジックと画面を独自に作成したものです。参照元のルール定義・文書には[公共データ利用規約 第1.0版（PDL 1.0）](https://github.com/digital-go-jp/machine_readability_rule/blob/main/LICENSE.md)が適用されます。
+> 本ツールは、デジタル庁の[公式Harunobu](https://www.digital.go.jp/resources/machine-readability-rule/harunobu)を出発点とし、[公開機械可読性ルール](https://github.com/digital-go-jp/machine_readability_rule)をGoogle Workspace上のスプレッドシートに適用できるよう、GASで再設計・独自実装した非公式の派生ツールです（公式Pythonコードを直接改変・移植したものではありません）。参照元のルール定義・文書には[公共データ利用規約 第1.0版（PDL 1.0）](https://github.com/digital-go-jp/machine_readability_rule/blob/main/LICENSE.md)が適用されます。
 >
 > 本ツールはデジタル庁の公式製品ではなく、デジタル庁による承認・保証を示すものではありません。公式Harunobuとは判定対象・判定方法・スコアが異なります。
 >

@@ -218,7 +218,9 @@ function inspectGrid_(input, limit) {
     }
   }
   if (occupiedRows.every(function (count) { return count === 0; })) {
-    return { findings: [], truncated: false };
+    // Even visually empty sheets may contain off-grid objects or hidden fields.
+    inspectAdditionalRules_(input, add);
+    return { findings: findings, truncated: truncated };
   }
 
   // L1-12: merged cells in the used range.

@@ -2,7 +2,6 @@
  * generic-harunobu: Google Sheets machine-readability checker (MVP)
  * Inspired by the Digital Agency's published machine-readability rules.
  * This is an independent implementation, NOT the official Harunobu engine.
- * @OnlyCurrentDoc
  */
 
 const GH_CONFIG = Object.freeze({
@@ -10,7 +9,119 @@ const GH_CONFIG = Object.freeze({
   HEADER_ROW: 1,
   MAX_CELLS_PER_SHEET: 100000,
   MAX_FINDINGS: 4000,
+  WEB_PREVIEW_LIMIT: 250,
 });
+
+/** Web app entry point. */
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle('generic-harunobu | 機械可読性チェッカー');
+}
+
+/** Parse a Google Sheets URL without fetching an arbitrary address. */
+function parseSpreadsheetId_(url) {
+  if (typeof url !== 'string' || url.length > 2048) {
+    throw new Error('GoogleスプレッドシートのURLを入力してください。');
+  }
+  const match = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{20,})(?:\/[^\s?#]*)?(?:\?[^\s#]*)?(?:#[^\s]*)?$/i.exec(url.trim());
+  if (!match) {
+    throw new Error('URLの形式が正しくありません。https://docs.google.com/spreadsheets/d/… のURLを指定してください。');
+  }
+  return match[1];
+}
+
+/** Web app callable function; never modifies source data sheets. */
+function checkSpreadsheetByUrl(url) {
+  const id = parseSpreadsheetId_(url);
+  let spreadsheet;
+  try {
+    spreadsheet = SpreadsheetApp.openById(id);
+  } catch (error) {
+    throw new Error('ファイルを開けませんでした。URL、共有権限、Googleアカウントの認証を確認してください。');
+  }
+  const candidates = spreadsheet.getSheets().filter(function(sheet) {
+    return sheet.getName() !== GH_CONFIG.REPORT_SHEET_NAME;
+  });
+  const audit = collectChecks_(candidates);
+  const report = { saved: false, url: '', message: '' };
+  if (!candidates.length) {
+    report.message = '診断対象のシートがありません。';
+  } else {
+    const lock = LockService.getScriptLock();
+    if (lock.tryLock(10000)) {
+      try {
+        const output = writeReport_(spreadsheet, audit.findings, audit.skipped, audit.truncated, audit.scanned);
+        report.saved = true;
+        report.url = spreadsheetCellUrl_(id, output.getSheetId(), 'A1');
+      } catch (error) {
+        console.warn('Report could not be saved: ' + error);
+        report.message = '診断は完了しましたが、結果シートには保存できませんでした。編集権限または既存の結果シート名を確認してください。';
+      } finally {
+        lock.releaseLock();
+      }
+    } else {
+      report.message = '診断は完了しましたが、他の実行と競合したため結果シートの保存を見送りました。';
+    }
+  }
+  return {
+    spreadsheetName: spreadsheet.getName(),
+    spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/' + id + '/edit',
+    spreadsheetId: id,
+    totalSheets: candidates.length,
+    scannedSheets: audit.scanned,
+    skipped: audit.skipped,
+    truncated: audit.truncated,
+    count: audit.findings.length,
+    counts: {
+      fix: audit.findings.filter(function(x) { return x.severity === '要修正'; }).length,
+      review: audit.findings.filter(function(x) { return x.severity === '要確認'; }).length
+    },
+    findings: audit.findings.slice(0, GH_CONFIG.WEB_PREVIEW_LIMIT).map(function(item) {
+      return {
+        ruleId: item.ruleId, severity: item.severity, sheetName: item.sheetName,
+        cell: item.cell, reason: item.reason, suggestion: item.suggestion,
+        url: spreadsheetCellUrl_(id, item.gid, item.cell)
+      };
+    }),
+    previewLimit: GH_CONFIG.WEB_PREVIEW_LIMIT,
+    report: report
+  };
+}
+
+function spreadsheetCellUrl_(id, gid, a1) {
+  return 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(id) +
+    '/edit#gid=' + encodeURIComponent(gid) + '&range=' + encodeURIComponent(a1);
+}
+
+/** Reusable sheet scan, no mutation. */
+function collectChecks_(sheets) {
+  const findings = [];
+  const skipped = [];
+  let truncated = false;
+  let scanned = 0;
+  for (const sheet of sheets) {
+    const range = sheet.getDataRange();
+    const rowCount = range.getNumRows();
+    const colCount = range.getNumColumns();
+    if (rowCount * colCount > GH_CONFIG.MAX_CELLS_PER_SHEET) {
+      skipped.push(sheet.getName() + '（' + rowCount + '行×' + colCount + '列）');
+      continue;
+    }
+    scanned++;
+    const result = inspectGrid_({
+      sheetName: sheet.getName(),
+      values: range.getValues(),
+      formulas: range.getFormulas(),
+      mergedA1: range.getMergedRanges().map(function(merged) {
+        return merged.getA1Notation();
+      }),
+      gid: sheet.getSheetId()
+    }, GH_CONFIG.MAX_FINDINGS - findings.length);
+    Array.prototype.push.apply(findings, result.findings);
+    truncated = truncated || result.truncated;
+  }
+  return { findings: findings, skipped: skipped, truncated: truncated, scanned: scanned };
+}
 
 /** Adds a menu when the spreadsheet opens. */
 function onOpen() {
@@ -49,32 +160,11 @@ function executeChecks_(spreadsheet, sheets) {
     SpreadsheetApp.getUi().alert('検査対象のシートがありません。');
     return;
   }
-  const findings = [];
-  const skipped = [];
-  let truncated = false;
-  sheets.forEach(function (sheet) {
-    const range = sheet.getDataRange();
-    const rowCount = range.getNumRows();
-    const colCount = range.getNumColumns();
-    if (rowCount * colCount > GH_CONFIG.MAX_CELLS_PER_SHEET) {
-      skipped.push(sheet.getName() + '（' + rowCount + '行×' + colCount + '列）');
-      return;
-    }
-    const input = {
-      sheetName: sheet.getName(),
-      values: range.getValues(),
-      formulas: range.getFormulas(),
-      mergedA1: range.getMergedRanges().map(function (merged) {
-        return merged.getA1Notation();
-      }),
-      gid: sheet.getSheetId(),
-    };
-    const result = inspectGrid_(input, GH_CONFIG.MAX_FINDINGS - findings.length);
-    Array.prototype.push.apply(findings, result.findings);
-    truncated = truncated || result.truncated;
-  });
-  writeReport_(spreadsheet, findings, skipped, truncated, sheets.length);
-  spreadsheet.toast('検出 ' + findings.length + '件。結果シートに出力しました。', '機械可読性チェック', 7);
+  const audit = collectChecks_(sheets);
+  const report = writeReport_(spreadsheet, audit.findings, audit.skipped, audit.truncated, audit.scanned);
+  spreadsheet.setActiveSheet(report);
+  report.setActiveSelection('A1');
+  spreadsheet.toast('検出 ' + audit.findings.length + '件。結果シートに出力しました。', '機械可読性チェック', 7);
 }
 
 /**
@@ -234,7 +324,22 @@ function looksLikeNumericText_(text) {
 /** Writes a fresh report. Only the report sheet is changed. */
 function writeReport_(spreadsheet, findings, skipped, truncated, sheetsScanned) {
   let report = spreadsheet.getSheetByName(GH_CONFIG.REPORT_SHEET_NAME);
-  if (!report) report = spreadsheet.insertSheet(GH_CONFIG.REPORT_SHEET_NAME);
+  if (!report) {
+    report = spreadsheet.insertSheet(GH_CONFIG.REPORT_SHEET_NAME);
+    report.addDeveloperMetadata('GENERIC_HARUNOBU_REPORT', '1');
+  } else {
+    const hasMarker = report.getDeveloperMetadata().some(function(m) {
+      return m.getKey() === 'GENERIC_HARUNOBU_REPORT';
+    });
+    const legacyHeader = report.getMaxColumns() >= 3 ?
+      report.getRange(1, 1, 1, 3).getDisplayValues()[0] : [];
+    const wasOldReport = legacyHeader[0] === '検査日時' &&
+      legacyHeader[1] === '重要度' && legacyHeader[2] === 'ルールID';
+    if (!hasMarker && !wasOldReport) {
+      throw new Error('同名のユーザーシートがあるため、上書きを中止しました。');
+    }
+    if (!hasMarker) report.addDeveloperMetadata('GENERIC_HARUNOBU_REPORT', '1');
+  }
   const filter = report.getFilter();
   if (filter) filter.remove();
   report.clear();
@@ -242,7 +347,7 @@ function writeReport_(spreadsheet, findings, skipped, truncated, sheetsScanned) 
   report.getRange(1, 1, 1, headers.length).setValues([headers]);
   const checkedAt = new Date();
   const rows = findings.map(function (item) {
-    const url = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(spreadsheet.getId()) + '/edit#gid=' + item.gid + '&range=' + encodeURIComponent(item.cell);
+    const url = spreadsheetCellUrl_(spreadsheet.getId(), item.gid, item.cell);
     return [checkedAt, item.severity, item.ruleId, item.sheetName, item.cell,
       item.reason, item.suggestion, '=HYPERLINK("' + url + '","開く")'];
   });
@@ -260,9 +365,8 @@ function writeReport_(spreadsheet, findings, skipped, truncated, sheetsScanned) 
   [160, 90, 110, 180, 110, 450, 490, 110].forEach(function (w, index) { report.setColumnWidth(index + 1, w); });
   report.getRange(2, 1, rows.length, headers.length).setVerticalAlignment('top').setWrap(true);
   report.getRange(1, 1, rows.length + 1, headers.length).createFilter();
-  spreadsheet.setActiveSheet(report);
-  report.setActiveSelection('A1');
   console.log('Checked ' + sheetsScanned + ' sheet(s); findings=' + findings.length + '; skipped=' + skipped.length + '; truncated=' + truncated);
+  return report;
 }
 
 function showHarunobuHelp() {

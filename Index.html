@@ -81,6 +81,7 @@
         </div>
       </form>
       <p class="hint">対象の全シートを診断します（生成した「機械可読性_検査結果」は除外）。元のデータは変更しません。</p>
+      <p class="hint">AIは使用しません。公式30ルールのうち23項目を自動検出または参考判定として扱います。<a href="https://github.com/cityriver52/generic-harunobu/blob/main/RULE_COVERAGE.md" target="_blank" rel="noopener noreferrer">対応状況を見る</a></p>
       <div id="status" role="status" aria-live="polite" class="hint" hidden></div>
       <div id="error" role="alert" class="alert" hidden></div>
     </section>
@@ -110,7 +111,7 @@
     <footer aria-label="出典とライセンス">
       <section class="license-notice" aria-labelledby="license-heading">
         <h2 id="license-heading">出典・ライセンス</h2>
-        <p>本ツールは、デジタル庁の<a href="https://www.digital.go.jp/resources/machine-readability-rule/harunobu" target="_blank" rel="noopener noreferrer">機械可読性ルール適合チェックツール「Harunobu」</a>および<a href="https://github.com/digital-go-jp/machine_readability_rule" target="_blank" rel="noopener noreferrer">「行政データにおける機械可読性に関するルール」</a>を参考に、generic-harunobu開発者が判定ロジックと画面を独自に作成したものです。参照元のルール定義・文書には<a href="https://github.com/digital-go-jp/machine_readability_rule/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer">公共データ利用規約 第1.0版（PDL 1.0）</a>が適用されます。</p>
+        <p>本ツールは、デジタル庁の<a href="https://www.digital.go.jp/resources/machine-readability-rule/harunobu" target="_blank" rel="noopener noreferrer">公式Harunobu</a>を出発点とし、<a href="https://github.com/digital-go-jp/machine_readability_rule" target="_blank" rel="noopener noreferrer">公開機械可読性ルール</a>をGoogle Workspace上のスプレッドシートに適用できるよう、GASで再設計・独自実装した非公式の派生ツールです（公式Pythonコードを直接改変・移植したものではありません）。参照元のルール定義・文書には<a href="https://github.com/digital-go-jp/machine_readability_rule/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer">公共データ利用規約 第1.0版（PDL 1.0）</a>が適用されます。</p>
         <p>本ツールはデジタル庁の公式製品ではなく、デジタル庁による承認・保証を示すものではありません。公式Harunobuとは判定対象・判定方法・スコアが異なります。</p>
         <p>本ツールの独自ソースコードは<a href="https://github.com/cityriver52/generic-harunobu/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>で公開しています。</p>
       </section>
@@ -199,6 +200,10 @@
     } else {
       box.className = 'note';
       box.textContent = data.report.message || '結果シートには保存されていません。';
+    }
+    if (data.coverageNotes && data.coverageNotes.length) {
+      const coverage = el('p', '一部未検査の範囲があります：' + data.coverageNotes.join(' / '), 'note');
+      box.append(coverage);
     }
     if (data.skipped.length || data.truncated) {
       const warning = el('p',

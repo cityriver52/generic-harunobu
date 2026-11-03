@@ -2,13 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '../Code.gs'), 'utf8');
-const sandbox = { console };
-vm.createContext(sandbox);
-vm.runInContext(source, sandbox);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '../ExtendedChecks.gs'), 'utf8'), sandbox);
+const sandbox = require('./helpers.cjs').load();
 const ID = '1ABcdEfGhIjKlMnOpQrStUvWxYz_98765';
 
 test('extracts ID from a standard Google spreadsheet URL', () => {

@@ -118,6 +118,7 @@
     </footer>
   </main>
   <script>
+  (function () {
   'use strict';
   const form = document.getElementById('check-form');
   const submit = document.getElementById('check-button');
@@ -176,7 +177,7 @@
     }
     const previewed = current.findings.length;
     document.getElementById('table-foot').textContent =
-      (current.count > previewed ? '画面では先頭' + previewed + '件を表示しています。全件は結果シートを参照してください。 ' : '') +
+      (current.count > previewed ? (current.report.saved ? '画面には先頭' + previewed + '件を表示しています。全件は結果シートを参照してください。 ' : '画面には先頭' + previewed + '件のみ表示できます。書き込み不可のため残りは表示できません。 ') : '') +
       '現在の絞り込み: ' + matching.length + '件 / 表示対象' + previewed + '件';
   }
   function render(data) {
@@ -207,7 +208,7 @@
     }
     if (data.skipped.length || data.truncated) {
       const warning = el('p',
-        (data.skipped.length ? '未検査（上限超過）: ' + data.skipped.join('、') + '。 ' : '') +
+        (data.skipped.length ? '未検査・エラー: ' + data.skipped.join('、') + '。 ' : '') +
         (data.truncated ? '検出上限に達したため、診断結果は一部のみです。' : ''), 'note');
       box.append(warning);
     }
@@ -234,6 +235,7 @@
       })
       .checkSpreadsheetByUrl(url);
   });
+  })();
   </script>
 </body>
 </html>

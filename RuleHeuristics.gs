@@ -1,9 +1,13 @@
-/**
- * Deterministic/heuristic additions corresponding to the published Harunobu rules.
- * This code does not invoke an AI API and does not reuse the official Python code.
- * All potential meaning-dependent defects are reported as 要確認.
- */
+/** Heuristics grouped by table layout, metadata, and cell/column values. */
 function inspectAdditionalRules_(input, add) {
+  const ctx=makeHeuristicContext_(input);
+  if (!ctx.height || !ctx.width) return;
+  inspectHeuristicLayout_(ctx,add);
+  inspectHeuristicStructure_(ctx,add);
+  inspectHeuristicValues_(ctx,add);
+}
+
+function makeHeuristicContext_(input) {
   const rows = input.values || [];
   const height = rows.length;
   const width = height ? rows[0].length : 0;
@@ -20,6 +24,11 @@ function inspectAdditionalRules_(input, add) {
     return /^(?:19|20)\d{2}(?:年|[-/])|^(?:令和|平成|昭和)\d{1,2}年|^[RHS]\d{1,2}(?:年)?$/i.test(text(value));
   };
 
+  return {input,rows,height,width,text,present,pos,headers,rowCells,normalize,dateLike};
+}
+
+function inspectHeuristicLayout_(ctx,add) {
+  const {input, rows, height, width, text, present, pos, headers, rowCells, normalize, dateLike} = ctx;
   // L1-02: repeated header patterns are a deterministic clue of multiple tables.
   if (height >= 4 && width >= 2) {
     const expected = headers.filter(function(v) { return v !== ''; }).length;
@@ -49,6 +58,10 @@ function inspectAdditionalRules_(input, add) {
     }
   }
 
+}
+
+function inspectHeuristicStructure_(ctx,add) {
+  const {input, rows, height, width, text, present, pos, headers, rowCells, normalize, dateLike} = ctx;
   // L1-08: known compatibility and private-use characters (names can be exceptions).
   const unsupported = /[\u2460-\u24ff\u2160-\u2188\u3370-\u33ff\uE000-\uF8FF]/u;
   for (let r = 0; r < height; r++) {
@@ -96,6 +109,10 @@ function inspectAdditionalRules_(input, add) {
       '公開・連携用データに不要であれば列ごと削除し、必要な列なら表示してください。');
   });
 
+}
+
+function inspectHeuristicValues_(ctx,add) {
+  const {input, rows, height, width, text, present, pos, headers, rowCells, normalize, dateLike} = ctx;
   // L2-02: common group-by columns whose blank cells may stand for "same as above".
   for (let c = 0; c < width; c++) {
     if (!/(都道府県|市区町村|地域|部署|所属|組織|分類|区分|年度|年月|種別)/.test(headers[c])) continue;
@@ -208,59 +225,4 @@ function inspectAdditionalRules_(input, add) {
       }
       runStart = -1;
     }
-  }
-}
-
-/** Lightweight formatting / visibility / object sampling for Google Sheets. */
-function sheetInspectionMetadata_(sheet, rows, cols) {
-  const info = { hiddenRows: [], hiddenColumns: [], objects: [], limitations: [] };
-  const maxRows = Math.min(rows, 120);
-  const maxCols = Math.min(cols, 50);
-  try {
-    if (typeof sheet.isRowHiddenByUser === 'function') {
-      for (let r = 1; r <= maxRows; r++) {
-        if (sheet.isRowHiddenByUser(r)) info.hiddenRows.push(r);
-      }
-      if (rows > maxRows) info.limitations.push('L1-13：非表示行は先頭' + maxRows + '行のみ確認');
-    } else info.limitations.push('L1-13：非表示行は取得不可');
-  } catch (e) { info.limitations.push('L1-13：非表示行の取得失敗'); }
-  try {
-    if (typeof sheet.isColumnHiddenByUser === 'function') {
-      for (let c = 1; c <= maxCols; c++) {
-        if (sheet.isColumnHiddenByUser(c)) info.hiddenColumns.push(c);
-      }
-      if (cols > maxCols) info.limitations.push('L1-13：非表示列は先頭' + maxCols + '列のみ確認');
-    } else info.limitations.push('L1-13：非表示列は取得不可');
-  } catch (e) { info.limitations.push('L1-13：非表示列の取得失敗'); }
-
-  const sources = [
-    { method: 'getImages', type: '画像' },
-    { method: 'getDrawings', type: '図形' },
-    { method: 'getCharts', type: 'グラフ' }
-  ];
-  sources.forEach(function(source) {
-    if (typeof sheet[source.method] !== 'function') {
-      info.limitations.push('L1-10：' + source.type + 'の取得不可');
-      return;
-    }
-    try {
-      const objects = sheet[source.method]() || [];
-      objects.slice(0, 100).forEach(function(object) {
-        let cell = 'A1';
-        try {
-          if (typeof object.getAnchorCell === 'function' && object.getAnchorCell())
-            cell = object.getAnchorCell().getA1Notation();
-          else if (typeof object.getContainerInfo === 'function') {
-            const anchor = object.getContainerInfo();
-            if (anchor && anchor.getAnchorRow && anchor.getAnchorColumn) {
-              cell = columnA1_(anchor.getAnchorColumn()) + anchor.getAnchorRow();
-            }
-          }
-        } catch (e) { /* keep safe fallback */ }
-        info.objects.push({ type: source.type, cell: cell });
-      });
-      if (objects.length > 100) info.limitations.push('L1-10：' + source.type + 'は100件まで確認');
-    } catch (e) { info.limitations.push('L1-10：' + source.type + 'の取得失敗'); }
-  });
-  return info;
-}
+  }}

@@ -8,6 +8,7 @@ const source = fs.readFileSync(path.join(__dirname, '../Code.gs'), 'utf8');
 const sandbox = { console };
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../ExtendedChecks.gs'), 'utf8'), sandbox);
 const ID = '1ABcdEfGhIjKlMnOpQrStUvWxYz_98765';
 
 test('extracts ID from a standard Google spreadsheet URL', () => {

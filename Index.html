@@ -54,7 +54,11 @@
     .severity.fix { color:#9b343d; background:#ffedf0; }
     .severity.review { color:#91611a; background:#fff4dc; }
     .table-foot { color:var(--muted); font-size:12px; margin-top:10px; }
-    footer { margin-top:30px; color:var(--muted); font-size:12px; text-align:center; }
+    footer { margin-top:30px; color:var(--muted); font-size:12px; text-align:left; }
+    .license-notice { border-top:1px solid var(--border); padding:21px 4px 0; }
+    .license-notice h2 { margin:0 0 8px; color:var(--ink); font-size:14px; }
+    .license-notice p { margin:7px 0; line-height:1.8; }
+    .license-notice a { text-decoration:underline; text-underline-offset:2px; }
     @media(max-width:640px) { .top { padding-top:22px; } .card { padding:18px 16px; } .url-row { flex-direction:column; } .summary { grid-template-columns:repeat(2,minmax(0,1fr)); } button { width:100%; } .toolbar input[type=search] { width:100%; } }
   </style>
 </head>
@@ -103,7 +107,14 @@
       <div class="table-scroll"><table><thead><tr><th>重要度</th><th>ルールID</th><th>シート</th><th>問題セル</th><th>理由</th><th>修正案</th></tr></thead><tbody id="findings"></tbody></table></div>
       <p id="table-foot" class="table-foot"></p>
     </section>
-    <footer>デジタル庁の公開ルールを参考にした独自MVPです。公式Harunobuの判定・100点採点とは一致しません。</footer>
+    <footer aria-label="出典とライセンス">
+      <section class="license-notice" aria-labelledby="license-heading">
+        <h2 id="license-heading">出典・ライセンス</h2>
+        <p>本ツールは、デジタル庁の<a href="https://www.digital.go.jp/resources/machine-readability-rule/harunobu" target="_blank" rel="noopener noreferrer">機械可読性ルール適合チェックツール「Harunobu」</a>および<a href="https://github.com/digital-go-jp/machine_readability_rule" target="_blank" rel="noopener noreferrer">「行政データにおける機械可読性に関するルール」</a>を参考に、generic-harunobu開発者が判定ロジックと画面を独自に作成したものです。参照元のルール定義・文書には<a href="https://github.com/digital-go-jp/machine_readability_rule/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer">公共データ利用規約 第1.0版（PDL 1.0）</a>が適用されます。</p>
+        <p>本ツールはデジタル庁の公式製品ではなく、デジタル庁による承認・保証を示すものではありません。公式Harunobuとは判定対象・判定方法・スコアが異なります。</p>
+        <p>本ツールの独自ソースコードは<a href="https://github.com/cityriver52/generic-harunobu/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>で公開しています。</p>
+      </section>
+    </footer>
   </main>
   <script>
   'use strict';

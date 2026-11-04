@@ -1,5 +1,5 @@
 /** Only this module edits report sheets; never the original data. */
-function writeReport_(spreadsheet, findings, skipped, truncated, sheetsScanned) {
+function writeReport_(spreadsheet, findings, skipped, truncated, sheetsScanned, sourceSpreadsheetId) {
   let report = spreadsheet.getSheetByName(GH_CONFIG.REPORT_SHEET_NAME);
   if (!report) {
     report = spreadsheet.insertSheet(GH_CONFIG.REPORT_SHEET_NAME);
@@ -14,7 +14,7 @@ function writeReport_(spreadsheet, findings, skipped, truncated, sheetsScanned) 
   report.getRange(1, 1, 1, headers.length).setValues([headers]);
   const checkedAt = new Date();
   const rows = findings.map(function (item) {
-    const url = spreadsheetCellUrl_(spreadsheet.getId(), item.gid, item.cell);
+    const url = spreadsheetCellUrl_(sourceSpreadsheetId || spreadsheet.getId(), item.gid, item.cell);
     return [checkedAt, item.severity, item.ruleId, safeReportText_(item.sheetName), item.cell,
       safeReportText_(item.reason), safeReportText_(item.suggestion), '=HYPERLINK("' + url + '","開く")'];
   });
@@ -34,4 +34,21 @@ function writeReport_(spreadsheet, findings, skipped, truncated, sheetsScanned) 
   report.getRange(1, 1, rows.length + 1, headers.length).createFilter();
   console.log('Checked ' + sheetsScanned + ' sheet(s); findings=' + findings.length + '; skipped=' + skipped.length + '; truncated=' + truncated);
   return report;
+}
+
+/**
+ * Create a new spreadsheet in the executing user's Google Drive.
+ * Only findings are written; the inspected spreadsheet is not changed.
+ */
+function writeStandaloneReport_(sourceSpreadsheet, audit) {
+  const date = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd_HHmmss');
+  const title = '機械可読性_診断結果_' + String(sourceSpreadsheet.getName()).slice(0, 65) + '_' + date;
+  const destination = SpreadsheetApp.create(title);
+  const initialSheet = destination.getSheets()[0];
+  initialSheet.setName(GH_CONFIG.REPORT_SHEET_NAME);
+  initialSheet.addDeveloperMetadata('GENERIC_HARUNOBU_REPORT', '1');
+  const resultSheet = writeReport_(
+    destination, audit.findings, audit.skipped, audit.truncated, audit.scanned, sourceSpreadsheet.getId()
+  );
+  return {spreadsheet: destination, sheet: resultSheet};
 }

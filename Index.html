@@ -20,6 +20,9 @@
     .eyebrow { color:var(--teal); font-size:12px; font-weight:750; letter-spacing:.07em; text-transform:uppercase; }
     h2 { margin:4px 0 14px; font-size:19px; }
     .url-row { display:flex; gap:10px; }
+    .output-choice { display:flex; flex-direction:column; align-items:flex-start; gap:6px; margin-top:16px; }
+    .output-choice label { font-weight:650; }
+    .output-choice select { width:min(510px,100%); padding:11px 12px; }
     input[type=url] { flex:1; min-width:0; border:1px solid #bfccd8; border-radius:9px; padding:13px 14px; font:inherit; background:white; color:var(--ink); }
     input[type=url]:focus,select:focus,input[type=search]:focus { outline:3px solid rgba(34,121,153,.18); border-color:#3c89a6; }
     button { font:inherit; cursor:pointer; border:0; border-radius:9px; padding:12px 22px; font-weight:700; background:#126c71; color:white; white-space:nowrap; }
@@ -79,9 +82,16 @@
           <input id="sheet-url" name="sheet-url" type="url" required autocomplete="url" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…" aria-label="GoogleスプレッドシートのURL">
           <button id="check-button" type="submit">診断を実行</button>
         </div>
+        <div class="output-choice">
+          <label for="output-mode">診断結果の保存先</label>
+          <select id="output-mode" name="output-mode">
+            <option value="new" selected>新しいスプレッドシートを作成（元ファイルは変更しない）</option>
+            <option value="source">診断元ファイルに結果シートを追加</option>
+          </select>
+        </div>
       </form>
-      <p class="hint">対象の全シートを診断します（生成した「機械可読性_検査結果」は除外）。元のデータは変更しません。</p>
-      <p class="hint">AIは使用しません。公式30ルールのうち23項目を自動検出または参考判定として扱います。<a href="https://github.com/cityriver52/generic-harunobu/blob/main/RULE_COVERAGE.md" target="_blank" rel="noopener noreferrer">対応状況を見る</a></p>
+      <p class="hint">対象の全シートを診断します。新しいファイルは実行ユーザーのGoogleドライブに作成されます。</p>
+      <p class="hint">AIは使用しません。公式30ルールのうち23項目を自動検出または参考判定として扱います。公式版と同じ採点結果を保証するものではありません。</p>
       <div id="status" role="status" aria-live="polite" class="hint" hidden></div>
       <div id="error" role="alert" class="alert" hidden></div>
     </section>
@@ -113,7 +123,7 @@
         <h2 id="license-heading">出典・ライセンス</h2>
         <p>本ツールは、デジタル庁の<a href="https://www.digital.go.jp/resources/machine-readability-rule/harunobu" target="_blank" rel="noopener noreferrer">公式Harunobu</a>を出発点とし、<a href="https://github.com/digital-go-jp/machine_readability_rule" target="_blank" rel="noopener noreferrer">公開機械可読性ルール</a>をGoogle Workspace上のスプレッドシートに適用できるよう、GASで再設計・独自実装した非公式の派生ツールです（公式Pythonコードを直接改変・移植したものではありません）。参照元のルール定義・文書には<a href="https://github.com/digital-go-jp/machine_readability_rule/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer">公共データ利用規約 第1.0版（PDL 1.0）</a>が適用されます。</p>
         <p>本ツールはデジタル庁の公式製品ではなく、デジタル庁による承認・保証を示すものではありません。公式Harunobuとは判定対象・判定方法・スコアが異なります。</p>
-        <p>本ツールの独自ソースコードは<a href="https://github.com/cityriver52/generic-harunobu/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>で公開しています。</p>
+        <p>本ツールにはMIT Licenseの表記が付属しています。ソースコードの一般公開を目的としたツールではありません。</p>
       </section>
     </footer>
   </main>
@@ -123,6 +133,7 @@
   const form = document.getElementById('check-form');
   const submit = document.getElementById('check-button');
   const input = document.getElementById('sheet-url');
+  const outputMode = document.getElementById('output-mode');
   const error = document.getElementById('error');
   const status = document.getElementById('status');
   const resultPanel = document.getElementById('result');
@@ -138,6 +149,7 @@
   function setBusy(working) {
     submit.disabled = working;
     input.disabled = working;
+    outputMode.disabled = working;
     submit.textContent = working ? '診断中…' : '診断を実行';
     status.hidden = !working;
     status.textContent = working ? 'ファイルを読み取り、ルールに照らして検査しています。' : '';
@@ -195,8 +207,8 @@
     box.replaceChildren(); box.hidden = false;
     if (data.report.saved) {
       box.className = 'success';
-      box.append(document.createTextNode('診断結果を対象ファイルの「機械可読性_検査結果」に保存しました。 '));
-      const a = el('a', '結果シートを開く');
+      box.append(document.createTextNode((data.report.message || '診断結果を保存しました。') + ' '));
+      const a = el('a', data.report.mode === 'new' ? '新しい結果ファイルを開く' : '結果シートを開く');
       a.href = data.report.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; box.append(a);
     } else {
       box.className = 'note';
@@ -233,7 +245,7 @@
         error.textContent = err && err.message ? err.message : '診断に失敗しました。時間をおいて再実行してください。';
         error.hidden = false;
       })
-      .checkSpreadsheetByUrl(url);
+      .checkSpreadsheetByUrl(url, outputMode.value);
   });
   })();
   </script>

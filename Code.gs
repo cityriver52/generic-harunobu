@@ -4,7 +4,12 @@ function doGet() {
     .setTitle('generic-harunobu | 機械可読性チェッカー');
 }
 
-function checkSpreadsheetByUrl(url) {
+/** Check a Sheets URL and save to source or new spreadsheet. */
+function checkSpreadsheetByUrl(url, outputMode) {
+  const mode = outputMode === undefined ? 'source' : outputMode;
+  if (mode !== 'source' && mode !== 'new') {
+    throw new Error('結果の保存先が正しくありません。画面を再読み込みしてください。');
+  }
   const id = parseSpreadsheetId_(url);
   let spreadsheet;
   try {
@@ -14,9 +19,19 @@ function checkSpreadsheetByUrl(url) {
   }
   const candidates = selectTargetSheets_(spreadsheet);
   const audit = collectChecks_(candidates);
-  const report = { saved: false, url: '', message: '' };
+  const report = { saved: false, url: '', message: '', mode: mode };
   if (!candidates.length) {
     report.message = '診断対象のシートがありません。';
+  } else if (mode === 'new') {
+    try {
+      const created = writeStandaloneReport_(spreadsheet, audit);
+      report.saved = true;
+      report.url = spreadsheetCellUrl_(created.spreadsheet.getId(), created.sheet.getSheetId(), 'A1');
+      report.message = '診断結果を新しいスプレッドシートに保存しました。';
+    } catch (error) {
+      console.warn('Standalone report failed: ' + error);
+      report.message = '診断は完了しましたが、新しい結果ファイルを作成できませんでした。作成権限・保存容量をご確認ください。';
+    }
   } else {
     const lock = LockService.getScriptLock();
     if (lock.tryLock(10000)) {
@@ -24,9 +39,10 @@ function checkSpreadsheetByUrl(url) {
         const output = writeReport_(spreadsheet, audit.findings, audit.skipped, audit.truncated, audit.scanned);
         report.saved = true;
         report.url = spreadsheetCellUrl_(id, output.getSheetId(), 'A1');
+        report.message = '診断元ファイルに結果シートを保存しました。';
       } catch (error) {
         console.warn('Report could not be saved: ' + error);
-        report.message = '診断は完了しましたが、結果シートには保存できませんでした。編集権限または既存の結果シート名を確認してください。';
+        report.message = '診断は完了しましたが、診断元ファイルに保存できませんでした。編集権限または同名シートを確認してください。';
       } finally {
         lock.releaseLock();
       }

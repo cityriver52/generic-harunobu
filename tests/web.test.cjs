@@ -62,5 +62,7 @@ test('uses the broad spreadsheets OAuth scope', () => {
 test('includes the browser-side asynchronous request', () => {
   const html = fs.readFileSync(path.join(__dirname, '../Index.html'), 'utf8');
   assert.match(html, /google\.script\.run/);
-  assert.match(html, /checkSpreadsheetByUrl\(url\)/);
+  assert.match(html, /checkSpreadsheetByUrl\(url, outputMode\.value\)/);
+  assert.match(html, /<option value="new" selected>/);
+  assert.doesNotMatch(html, /github\.com\/cityriver52\/generic-harunobu/);
 });

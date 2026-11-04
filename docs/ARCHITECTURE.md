@@ -29,3 +29,13 @@ URL → Code.gs → SheetReader.gs → RuleEngine.gs + RuleHeuristics.gs
 
 ## テスト
 `npm test`。NodeのVMが `tests/helpers.cjs` の定義順にGASスクリプトを読み込みます。GASへの実際のデプロイ・OAuth・画面動作の結合テストは別途必要です。
+
+
+## 診断結果の保存先
+
+- Web API は `checkSpreadsheetByUrl(url, outputMode)`。`outputMode` は `new`（新規ファイル）または `source`（元ファイルに結果シート）。未指定時は既存の呼び出しとの互換性を保つため `source`。
+- Web UIでは安全側の初期選択を `new` とする。これにより診断元ファイルの内容・構造は変更されない。
+- `new` は `SpreadsheetApp.create` により実行ユーザーのGoogleドライブに結果ファイルを作成する。新規ファイルには検査結果のみを保存し、リンク先のIDは診断元ファイルのものを使用する。
+- `source` は診断元ファイルに編集権限が必要で、既存の生成結果シートのみ上書き可能。
+- 保存に失敗した場合も、Web上で先頭250件の診断結果を表示する。
+- 利用者向け画面には個人GitHubリポジトリのリンクを設置しない。GitHubの一般公開は予定しておらず、最終的に非公開化する。
